@@ -2,17 +2,21 @@ module github.com/goletan/api-graphql
 
 go 1.23.2
 
+require (
+	github.com/goletan/config v0.0.0-00010101000000-000000000000
+	github.com/goletan/security v0.0.0-00010101000000-000000000000
+	github.com/goletan/services v0.0.0-00010101000000-000000000000
+	github.com/graphql-go/graphql v0.8.1
+	github.com/graphql-go/handler v0.2.4
+)
+
 replace github.com/goletan/services => ../services
 
 replace github.com/goletan/observability => ../observability
 
 replace github.com/goletan/config => ../config
 
-require (
-	github.com/goletan/services v0.0.0-00010101000000-000000000000
-	github.com/graphql-go/graphql v0.8.1
-	github.com/graphql-go/handler v0.2.4
-)
+replace github.com/goletan/security => ../security
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -21,7 +25,6 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goletan/config v0.0.0-00010101000000-000000000000 // indirect
 	github.com/goletan/observability v0.0.0-00010101000000-000000000000 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
@@ -54,8 +57,8 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.1 // indirect

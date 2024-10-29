@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/goletan/config"
+	"github.com/goletan/security/mtls"
 	"github.com/goletan/services"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
@@ -16,7 +18,16 @@ import (
 type GraphQLServer struct {
 	server *http.Server
 	name   string
+	useTLS bool
 }
+
+// GraphQLConfig holds the configuration for the GraphQL server.
+type GraphQLConfig struct {
+	Address string `mapstructure:"address"`
+	UseTLS  bool   `mapstructure:"use_tls"`
+}
+
+var cfg *GraphQLConfig
 
 // Define a simple root query object.
 var rootQuery = graphql.NewObject(graphql.ObjectConfig{
@@ -33,6 +44,12 @@ var rootQuery = graphql.NewObject(graphql.ObjectConfig{
 
 // NewGraphQLServer creates a new instance of the GraphQLServer.
 func NewGraphQLServer() services.Service {
+	cfg = &GraphQLConfig{}
+	err := config.LoadConfig("GraphQL", cfg, nil)
+	if err != nil {
+		fmt.Printf("Warning: failed to load GraphQL configuration, using defaults: %v\n", err)
+	}
+
 	schemaConfig := graphql.SchemaConfig{Query: rootQuery}
 	schema, err := graphql.NewSchema(schemaConfig)
 	if err != nil {
@@ -44,12 +61,19 @@ func NewGraphQLServer() services.Service {
 		GraphiQL: true,
 	})
 
+	tlsConfig, err := mtls.ConfigureMTLS()
+	if err != nil {
+		fmt.Printf("Warning: failed to configure mTLS, proceeding without TLS: %v\n", err)
+	}
+
 	return &GraphQLServer{
 		server: &http.Server{
-			Addr:    ":8081",
-			Handler: h,
+			Addr:      cfg.Address,
+			Handler:   h,
+			TLSConfig: tlsConfig,
 		},
-		name: "GraphQL Server",
+		name:   "GraphQL Server",
+		useTLS: cfg.UseTLS,
 	}
 }
 
@@ -67,8 +91,14 @@ func (s *GraphQLServer) Initialize() error {
 // Start starts the GraphQL server.
 func (s *GraphQLServer) Start() error {
 	go func() {
-		log.Printf("Starting %s on :8081", s.name)
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("Starting %s on %s", s.name, s.server.Addr)
+		var err error
+		if s.useTLS {
+			err = s.server.ListenAndServeTLS("", "")
+		} else {
+			err = s.server.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			log.Printf("Failed to start %s: %v", s.name, err)
 		}
 	}()
