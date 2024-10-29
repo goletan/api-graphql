@@ -1,3 +1,5 @@
 graphql:
   address: ""
   use_tls: false
+  cert_file_path: ""
+  key_file_path: ""

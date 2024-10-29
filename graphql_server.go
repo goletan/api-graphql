@@ -23,8 +23,10 @@ type GraphQLServer struct {
 
 // GraphQLConfig holds the configuration for the GraphQL server.
 type GraphQLConfig struct {
-	Address string `mapstructure:"address"`
-	UseTLS  bool   `mapstructure:"use_tls"`
+	Address      string `mapstructure:"address"`
+	UseTLS       bool   `mapstructure:"use_tls"`
+	CertFilePath string `mapstructure:"cert_file_path"`
+	KeyFilePath  string `mapstructure:"key_file_path"`
 }
 
 var cfg *GraphQLConfig
@@ -94,7 +96,7 @@ func (s *GraphQLServer) Start() error {
 		log.Printf("Starting %s on %s", s.name, s.server.Addr)
 		var err error
 		if s.useTLS {
-			err = s.server.ListenAndServeTLS("", "")
+			err = s.server.ListenAndServeTLS(cfg.CertFilePath, cfg.KeyFilePath)
 		} else {
 			err = s.server.ListenAndServe()
 		}
