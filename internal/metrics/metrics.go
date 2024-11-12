@@ -1,11 +1,10 @@
-// /api-graphql/metrics.go
-package graphql
+// /api-graphql/internal/metrics/metrics.go
+package metrics
 
 import (
 	"net/http"
 
-	"github.com/goletan/observability/metrics"
-	"github.com/goletan/observability/utils"
+	observability "github.com/goletan/observability/pkg"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -24,26 +23,22 @@ var (
 	)
 )
 
-// Security Tool: Scrub sensitive data
-var (
-	scrubber = utils.NewScrubber()
-)
-
-func InitMetrics() {
-	metrics.NewManager().Register(&GraphQLMetrics{})
+// InitMetrics initializes and registers GraphQL metrics with the observability.
+func InitMetrics(obs *observability.Observability) *GraphQLMetrics {
+	met := &GraphQLMetrics{}
+	obs.Metrics.Register(met)
+	return met
 }
 
+// Register registers the GraphQL metrics with Prometheus.
 func (em *GraphQLMetrics) Register() error {
 	if err := prometheus.Register(RequestDuration); err != nil {
 		return err
 	}
-
 	return nil
 }
 
 // ObserveRequestDuration records the duration of HTTP requests.
 func ObserveRequestDuration(method, endpoint string, status int, duration float64) {
-	scrubbedMethod := scrubber.Scrub(method)
-	scrubbedEndpoint := scrubber.Scrub(endpoint)
-	RequestDuration.WithLabelValues(scrubbedMethod, scrubbedEndpoint, http.StatusText(status)).Observe(duration)
+	RequestDuration.WithLabelValues(method, endpoint, http.StatusText(status)).Observe(duration)
 }
