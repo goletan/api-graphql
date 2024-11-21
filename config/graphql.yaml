@@ -1,0 +1,4 @@
+graphql:
+  address: "localhost:8081"
+  cert_file_path: "/certs/server.pem"
+  key_file_path: "/certs/server.key"

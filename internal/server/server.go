@@ -3,6 +3,8 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -21,6 +23,7 @@ type GraphQLServer struct {
 	name           string
 	observability  *observability.Observability
 	securityModule *security.Security
+	config         *GraphQLConfig
 	useTLS         bool
 }
 
@@ -32,48 +35,18 @@ type GraphQLConfig struct {
 	KeyFilePath  string `mapstructure:"key_file_path"`
 }
 
-var cfg *GraphQLConfig
-
 // NewGraphQLServer creates a new instance of the GraphQLServer.
 func NewGraphQLServer(obs *observability.Observability) services.Service {
-	// Load configuration
-	cfg = &GraphQLConfig{}
-	err := config.LoadConfig("GraphQL", cfg, obs.Logger)
-	if err != nil {
-		obs.Logger.Warn("Failed to load GraphQL configuration, using defaults", zap.Error(err))
+	config := loadGraphQLConfig(obs)
+
+	// Setup Security
+	securityModule := setupSecurityModule(obs)
+	if securityModule == nil {
+		obs.Logger.Fatal("Security module could not be initialized")
 	}
 
-	// Set up GraphQL schema
-	schema, err := schemas.InitSchema()
-	if err != nil {
-		obs.Logger.Fatal("Failed to initialize GraphQL schema", zap.Error(err))
-	}
-
-	// Create GraphQL handler
-	h := handler.New(&handler.Config{
-		Schema:   schema,
-		GraphiQL: true,
-	})
-
-	// Load and configure security module (mTLS)
-	securityModule, secErr := security.NewSecurity(obs.Logger)
-	if secErr != nil {
-		obs.Logger.Error("Failed to initialize security module", zap.Error(secErr))
-	}
-
-	// Configure TLS
-	tlsConfig, err := securityModule.CertLoader.LoadServerTLSConfig()
-	if err != nil {
-		obs.Logger.Warn("Failed to configure mTLS, proceeding without TLS", zap.Error(err))
-	}
-
-	// Initialize HTTP server
-	server := &http.Server{
-		Addr:              cfg.Address,
-		Handler:           h,
-		ReadHeaderTimeout: 5 * time.Second,
-		TLSConfig:         tlsConfig,
-	}
+	// Setup server
+	server := setupServer(obs, securityModule, config)
 
 	// Create the GraphQLServer instance
 	return &GraphQLServer{
@@ -81,7 +54,8 @@ func NewGraphQLServer(obs *observability.Observability) services.Service {
 		name:           "GraphQL Server",
 		observability:  obs,
 		securityModule: securityModule,
-		useTLS:         cfg.UseTLS,
+		config:         config,
+		useTLS:         config.UseTLS,
 	}
 }
 
@@ -93,23 +67,33 @@ func (s *GraphQLServer) Name() string {
 // Initialize performs any initialization tasks needed by the service.
 func (s *GraphQLServer) Initialize() error {
 	s.observability.Logger.Info("Initializing GraphQL server", zap.String("service", s.name))
+
+	// Setup Security Module again to ensure all security setups are reloaded if needed
+	s.securityModule = setupSecurityModule(s.observability)
+	if s.securityModule == nil {
+		s.observability.Logger.Error("Failed to initialize security module during server initialization")
+		return fmt.Errorf("security module initialization failed")
+	}
+
 	return nil
 }
 
 // Start starts the GraphQL server.
 func (s *GraphQLServer) Start() error {
-	go func() {
-		s.observability.Logger.Info("Starting GraphQL server", zap.String("address", s.server.Addr))
-		var err error
-		if s.useTLS {
-			err = s.server.ListenAndServeTLS(cfg.CertFilePath, cfg.KeyFilePath)
-		} else {
-			err = s.server.ListenAndServe()
-		}
-		if err != nil && err != http.ErrServerClosed {
-			s.observability.Logger.Error("Failed to start GraphQL server", zap.Error(err))
-		}
-	}()
+	s.observability.Logger.Info("Starting GraphQL server", zap.String("address", s.server.Addr))
+	var err error
+	if s.useTLS {
+		err = s.server.ListenAndServeTLS(s.config.CertFilePath, s.config.KeyFilePath)
+	} else {
+		err = s.server.ListenAndServe()
+	}
+	if err != nil && err != http.ErrServerClosed {
+		s.observability.Logger.Error("Failed to start GraphQL server", zap.Error(err))
+		return err
+	}
+	if err == http.ErrServerClosed {
+		s.observability.Logger.Info("GraphQL server has been stopped gracefully")
+	}
 	return nil
 }
 
@@ -119,4 +103,64 @@ func (s *GraphQLServer) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return s.server.Shutdown(ctx)
+}
+
+func loadGraphQLConfig(obs *observability.Observability) *GraphQLConfig {
+	cfg := &GraphQLConfig{
+		Address: ":8081", // Set default values here if needed
+		UseTLS:  false,
+	}
+	err := config.LoadConfig("GraphQL", cfg, obs.Logger)
+	if err != nil {
+		obs.Logger.Warn("Failed to load GraphQL configuration, using defaults", zap.Error(err))
+	}
+	return cfg
+}
+
+func setupSecurityModule(obs *observability.Observability) *security.Security {
+	securityModule, err := security.NewSecurity(obs.Logger)
+	if err != nil {
+		obs.Logger.Error("Failed to initialize security module", zap.Error(err))
+		return nil
+	}
+	return securityModule
+}
+
+func setupServer(obs *observability.Observability, securityModule *security.Security, cfg *GraphQLConfig) *http.Server {
+	var tlsConfig *tls.Config
+	var err error
+
+	// Configure TLS
+	if securityModule != nil {
+		tlsConfig, err = securityModule.CertLoader.LoadServerTLSConfig()
+		if err != nil {
+			obs.Logger.Warn("Failed to configure mTLS, proceeding without TLS", zap.Error(err))
+		}
+	} else {
+		obs.Logger.Warn("Security module is nil, proceeding without TLS")
+	}
+
+	// Set up GraphQL schema
+	schema, err := schemas.InitSchema()
+	if err != nil {
+		obs.Logger.Fatal("Failed to initialize GraphQL schema", zap.Error(err))
+	}
+
+	obs.Logger.Sugar().Infof("server address: %s", cfg.Address)
+
+	// Create GraphQL handler
+	h := handler.New(&handler.Config{
+		Schema:   schema,
+		GraphiQL: true,
+	})
+
+	// Initialize HTTP server
+	server := &http.Server{
+		Addr:              cfg.Address,
+		Handler:           h,
+		ReadHeaderTimeout: 5 * time.Second,
+		TLSConfig:         tlsConfig,
+	}
+
+	return server
 }
