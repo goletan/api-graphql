@@ -1,5 +1,4 @@
 # Observability Config
-
 bulkhead:
   capacity: 1
   timeout: 5s

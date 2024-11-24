@@ -3,7 +3,7 @@ module github.com/goletan/api-graphql
 go 1.23
 
 require (
-	github.com/goletan/config v0.0.0-20241117132450-f61d955a9e0c
+	github.com/goletan/config v0.0.0-20241121121134-ea241b29ea36
 	github.com/goletan/observability v0.0.0-00010101000000-000000000000
 	github.com/goletan/security v0.0.0-00010101000000-000000000000
 	github.com/goletan/services v0.0.0-00010101000000-000000000000
@@ -18,7 +18,7 @@ replace github.com/goletan/config => github.com/goletan/config v0.0.0-2024112112
 
 replace github.com/goletan/services => github.com/goletan/services v0.0.0-20241118174810-0d95a57e12ac
 
-replace github.com/goletan/observability => github.com/goletan/observability v0.0.0-20241121101321-6053cbf33b12
+replace github.com/goletan/observability => github.com/goletan/observability v0.0.0-20241121203152-37ca2382a1a9
 
 replace github.com/goletan/security => github.com/goletan/security v0.0.0-20241121101306-dd7f63bf1e86
 

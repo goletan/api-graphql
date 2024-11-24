@@ -3,14 +3,22 @@ package main
 
 import (
 	"github.com/goletan/api-graphql/internal/server"
+	config "github.com/goletan/config/pkg"
+	obsConfig "github.com/goletan/observability/config"
 	observability "github.com/goletan/observability/pkg"
 	"go.uber.org/zap"
 )
 
 func main() {
-	// Initialize observability with the configuration
-	obs, err := observability.NewObserver()
+	var obsCfg *obsConfig.ObservabilityConfig
+	err := config.LoadConfig("Observability", &obsCfg, nil)
 	if err != nil {
+		panic(err)
+	}
+
+	// Initialize observability with the configuration
+	obs, err := observability.NewObserver(obsCfg)
+	if err != nil
 		obs.Logger.Error("Failed to initialize observability: %v", zap.Error(err))
 	}
 
