@@ -18,7 +18,7 @@ func main() {
 
 	// Initialize observability with the configuration
 	obs, err := observability.NewObserver(obsCfg)
-	if err != nil
+	if err != nil {
 		obs.Logger.Error("Failed to initialize observability: %v", zap.Error(err))
 	}
 
